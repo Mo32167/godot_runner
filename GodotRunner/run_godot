@@ -1,0 +1,63 @@
+#!/bin/bash
+
+# Set the base directory where all the Godot versions are stored
+godot_base_dir="$HOME/Apps/GodotRunner"
+log_dir="$godot_base_dir/Logs"
+
+# Create the Logs directory if it doesn't exist
+mkdir -p "$log_dir"
+
+# Get the current date and time for the log file name (e.g., log_2024-12-24_14-30-00.txt)
+log_file="$log_dir/log_$(date +'%Y-%m-%d_%H-%M-%S').txt"
+
+# Find all executable files starting with "Godot" and ending with ".x86_64" in the base directory
+# Ensure we handle filenames with spaces by properly quoting the variables
+godot_versions=()
+while IFS= read -r godot_version; do
+    godot_versions+=("$godot_version")
+done < <(find "$godot_base_dir" -maxdepth 2 -type f -name "Godot*.x86_64" -executable)
+
+# Check if there are any versions found
+if [ ${#godot_versions[@]} -eq 0 ]; then
+    echo "No Godot versions found in $godot_base_dir."
+    exit 1
+fi
+
+# If only one version is found, run it automatically
+if [ ${#godot_versions[@]} -eq 1 ]; then
+    selected_version="${godot_versions[0]}"
+    echo "Only one Godot version found. Running: $selected_version"
+    echo "Running Godot version: $selected_version" > "$log_file"
+    "$selected_version" >> "$log_file" 2>&1
+    exit 0
+fi
+
+# Display the available Godot versions
+echo "Available Godot versions:"
+for i in "${!godot_versions[@]}"; do
+    echo "$((i + 1)). ${godot_versions[$i]}"
+done
+
+# Ask the user to select a version
+read -p "Select a version to run (1-${#godot_versions[@]}): " choice
+
+# Validate the input
+if [[ "$choice" -lt 1 || "$choice" -gt ${#godot_versions[@]} ]]; then
+    echo "Invalid choice, exiting."
+    exit 1
+fi
+
+# Get the selected version
+selected_version="${godot_versions[$((choice - 1))]}"
+
+# Run the selected version of Godot and log the output
+echo "Running Godot version: $selected_version" > "$log_file"
+"$selected_version" >> "$log_file" 2>&1
+
+# After Godot finishes, rotate logs if there are more than 10 files
+log_files=($(ls -t "$log_dir/log_*.txt"))
+if [ ${#log_files[@]} -gt 10 ]; then
+    # Delete the oldest log file
+    rm "${log_files[-1]}"
+fi
+
